@@ -1,21 +1,22 @@
-#![windows_subsystem = "windows"]
 extern crate native_windows_gui as nwg;
 
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 
-use nwg::{HTextAlign, NativeUi, NwgError};
+use nwg::{HTextAlign, NativeUi, Notice, NoticeSender, NwgError};
 use once_cell::sync::Lazy;
 
 use crate::config::Config;
-use crate::jre::jre_exist;
+use crate::jre::get_jre;
 use crate::launcher::{launcher_exist, run_launcher};
 use crate::util::get_pointer_width;
-use std::path::Path;
+use anyhow::Error;
+use dirs::data_dir;
+use std::path::{Path, PathBuf};
 
 mod config;
 mod jre;
@@ -115,47 +116,7 @@ impl NativeUi<DownloadUi> for Download {
                     E::OnInit => {
                         let notice = ui.notice.sender();
                         let send = send.clone();
-                        thread::spawn(move || {
-                            if !jre::jre_exist() {
-                                if jre::download_jre().is_err() {
-                                    send.send(11);
-                                    notice.notice();
-                                    panic!()
-                                } else {
-                                    send.send(1);
-                                    notice.notice();
-                                }
-                                if jre::extract_jre().is_err() {
-                                    send.send(11);
-                                    notice.notice();
-                                    panic!()
-                                } else {
-                                    send.send(2);
-                                    notice.notice();
-                                }
-                            }
-                            if !launcher::launcher_exist() {
-                                if launcher::download_launcher().is_err() {
-                                    send.send(11);
-                                    notice.notice();
-                                }
-                            }
-                            send.send(3);
-                            notice.notice();
-                            if launcher_exist() && jre_exist() {
-                                if run_launcher().is_err() {
-                                    send.send(11);
-                                    notice.notice();
-                                    panic!()
-                                } else {
-                                    send.send(10);
-                                    notice.notice();
-                                }
-                            } else {
-                                send.send(11);
-                                notice.notice();
-                            }
-                        });
+                        thread::spawn(move || run_downloader(send, notice));
                     }
                     E::OnWindowClose => {
                         if &handle == &ui.window {
@@ -207,6 +168,55 @@ impl NativeUi<DownloadUi> for Download {
     }
 }
 
+macro_rules! error {
+    ($sender:expr, $notice:expr) => {
+        $sender.send(11);
+        $notice.notice();
+        panic!()
+    };
+}
+
+macro_rules! update {
+    ($sender:expr, $notice:expr, $x:expr) => {
+        $sender.send($x);
+        $notice.notice();
+    };
+}
+
+pub fn run_downloader(send: Sender<u64>, notice: NoticeSender) {
+    let jre_path = match get_jre() {
+        None => {
+            if jre::download_jre().is_err() {
+                error!(send, notice);
+            } else {
+                update!(send, notice, 1);
+            }
+            if jre::extract_jre().is_err() {
+                error!(send, notice);
+            } else {
+                update!(send, notice, 2);
+            }
+            get_jre().unwrap()
+        }
+        Some(jre) => jre,
+    };
+    if !launcher::launcher_exist() {
+        if launcher::download_launcher().is_err() {
+            error!(send, notice);
+        }
+    }
+    update!(send, notice, 3);
+    if launcher::launcher_exist() {
+        if run_launcher(jre_path.as_path()).is_err() {
+            error!(send, notice);
+        } else {
+            update!(send, notice, 10);
+        }
+    } else {
+        error!(send, notice);
+    }
+}
+
 impl Drop for DownloadUi {
     fn drop(&mut self) {
         let handler = self.default_handler.borrow();
@@ -225,8 +235,9 @@ impl Deref for DownloadUi {
 }
 
 fn main() {
-    if launcher_exist() && jre_exist() {
-        run_launcher();
+    let jre = get_jre();
+    if launcher_exist() && jre.is_some() {
+        run_launcher(jre.unwrap().as_path());
     } else {
         nwg::init().expect("Failed to init Native Windows GUI");
         nwg::Font::set_global_family("Segoe UI").expect("Failed to set default font");

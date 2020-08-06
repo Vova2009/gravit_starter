@@ -3,13 +3,20 @@ use crate::CONFIG;
 use anyhow::Result;
 use dirs::data_dir;
 use std::fs;
-use std::process::exit;
+use std::path::PathBuf;
+use std::process::{exit, Command};
 
-pub fn jre_exist() -> bool {
+pub fn get_jre() -> Option<PathBuf> {
     let mut dir = data_dir().unwrap();
     dir.push(&CONFIG.project_name);
     dir.push("launcher-jre");
-    dir.is_dir()
+    if dir.is_dir() {
+        Some(dir)
+    } else if CONFIG.check_jre {
+        find_jre()
+    } else {
+        None
+    }
 }
 
 pub fn download_jre() -> Result<()> {
@@ -34,4 +41,29 @@ pub fn extract_jre() -> Result<()> {
     extract_zip(&zip_path, &dir_path)?;
     fs::remove_file(zip_path)?;
     Ok(())
+}
+
+pub fn find_jre() -> Option<PathBuf> {
+    Command::new("java")
+        .arg("-XshowSettings:properties")
+        .arg("-version")
+        .output()
+        .ok()
+        .and_then(|output| {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            for line in stdout.lines().chain(stderr.lines()) {
+                if line.contains("java.home") {
+                    let pos = line.find('=').unwrap() + 1;
+                    let path = line[pos..].trim();
+                    let buf = PathBuf::from(path);
+                    return if buf.join("lib").join("javafx.properties").is_file() {
+                        Some(buf)
+                    } else {
+                        None
+                    };
+                }
+            }
+            None
+        })
 }

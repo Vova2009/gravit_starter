@@ -7,6 +7,7 @@ pub struct Config {
     pub(crate) launcher_url: Url,
     pub(crate) jre_urls: Jre,
     pub(crate) title: String,
+    pub(crate) check_jre: bool,
 }
 
 #[derive(Deserialize)]
