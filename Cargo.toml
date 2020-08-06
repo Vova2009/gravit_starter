@@ -1,0 +1,45 @@
+[package]
+name = "gravit_starter"
+version = "0.1.0"
+authors = ["vova2009"]
+edition = "2018"
+build = "build.rs"
+
+[dependencies]
+serde_json = "1.0"
+once_cell = "1.4"
+anyhow = "1.0"
+dirs = "3.0"
+zip = "0.5"
+
+[dependencies.native-windows-gui]
+version = "1.0.1"
+features = ["progress-bar", "notice", "embed-resource", "image-decoder"]
+
+[dependencies.http_req]
+version="0.7"
+default-features = false
+features = ["rust-tls"]
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.url]
+version = "2.1"
+features = ["serde"]
+
+[dependencies.winapi]
+version = "0.3"
+features = ["winnt"]
+
+[build-dependencies]
+winres = "0.1"
+
+
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'
