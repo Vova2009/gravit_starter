@@ -3,6 +3,7 @@
     "x32": "https://example.com/jre-32.zip",
     "x64": "https://example.com/jre-64.zip"
   },
+  "check_jre": false,
   "title": "Minecraft",
   "launcher_url": "https://example.com/Launcher.jar",
   "project_name": "example_craft"
