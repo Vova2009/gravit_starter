@@ -54,7 +54,10 @@ pub fn find_jre() -> Option<PathBuf> {
             let stderr = String::from_utf8_lossy(&output.stderr);
             for line in stdout.lines().chain(stderr.lines()) {
                 if line.contains("java.home") {
-                    let pos = line.find('=').unwrap() + 1;
+                    let pos = match line.find('=') {
+                        None => { continue; }
+                        Some(pos) => { pos + 1 }
+                    };
                     let path = line[pos..].trim();
                     let buf = PathBuf::from(path);
                     return if buf.join("lib").join("javafx.properties").is_file() {
