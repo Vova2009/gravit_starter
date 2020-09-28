@@ -69,7 +69,7 @@ impl NativeUi<DownloadUi> for Download {
             .size((300, 115))
             .position((300, 300))
             .title(&CONFIG.title)
-            .icon(em.icon_str("MAINICON").as_ref())
+            .icon(em.icon_str("MAINICON", None).as_ref())
             .build(&mut data.window)?;
 
         nwg::Label::builder()
